@@ -22,11 +22,11 @@ async function getBrowser() {
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
       executablePath,
-      headless: chromium.headless,
+      headless: true,
     });
     return browser;
   } else {
-    const puppeteer = await import("puppeteer").then((mod) => mod.default);
+    const puppeteer = await import("puppeteer-core").then((mod) => mod.default);
     const browser = await puppeteer.launch();
     return browser;
   }
