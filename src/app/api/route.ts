@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const CHROMIUM_PATH =
   "https://vomrghiulbmrfvmhlflk.supabase.co/storage/v1/object/public/chromium-pack/chromium-v123.0.0-pack.tar";
@@ -26,7 +27,6 @@ async function getBrowser() {
     return browser;
   } else {
     const puppeteer = await import("puppeteer").then((mod) => mod.default);
-
     const browser = await puppeteer.launch();
     return browser;
   }
