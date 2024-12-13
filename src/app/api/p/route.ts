@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
 
-const chromium = require("@sparticuz/chromium-min");
-const puppeteer = require("puppeteer-core");
+import chromium from "@sparticuz/chromium-min";
+import puppeteer, { Browser } from "puppeteer-core";
 
 const localExecutablePath =
   process.platform === "win32"
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  let browser: unknown;
+  let browser: Browser | null = null;
   try {
     browser = await puppeteer.launch({
       ignoreDefaultArgs: ["--enable-automation"],
@@ -48,11 +48,10 @@ export async function GET(request: NextRequest) {
       executablePath: isDev
         ? localExecutablePath
         : await chromium.executablePath(remoteExecutablePath),
-      headless: isDev ? false : "new",
+      headless: isDev ? false : "shell",
       debuggingPort: isDev ? 9222 : undefined,
     });
 
-    // @ts-ignore
     const pages = await browser.pages();
     const page = pages[0];
     await page.setUserAgent(userAgent);
@@ -84,7 +83,8 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   } finally {
-    // @ts-ignore
-    await browser.close();
+    if (browser) {
+      await browser.close();
+    }
   }
 }
