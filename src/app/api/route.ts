@@ -5,6 +5,8 @@ import { extractText } from "@/utils/parser";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+type ScraperType = "browser" | "fetch";
+
 export async function GET(request: NextRequest) {
   try {
     const browser = await getBrowser();
@@ -13,11 +15,30 @@ export async function GET(request: NextRequest) {
     const strictFilter = Boolean(
       requestUrl.searchParams.get("strict") === "true"
     );
+    let type = requestUrl.searchParams.get("type") as ScraperType | null
+    if (!type) {
+      type = "fetch"
+    }
 
     if (!urlQuery) {
       return NextResponse.json(
         { error: "Missing url parameter" },
         { status: 400 }
+      );
+    }
+
+    if (type === "fetch") {
+      const response = await fetch(urlQuery);
+      const htmlContent = await response.text();
+      const cleanedText = extractText(htmlContent);
+
+      return NextResponse.json(
+        {
+          total: 0,
+          links: [],
+          cleanedText,
+        },
+        { status: 200 }
       );
     }
 
