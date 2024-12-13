@@ -1,47 +1,105 @@
+import { getBrowser } from "@/utils/load-browser";
 import { NextRequest, NextResponse } from "next/server";
+import { extractText } from "@/utils/parser";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const CHROMIUM_PATH =
-  "https://vomrghiulbmrfvmhlflk.supabase.co/storage/v1/object/public/chromium-pack/chromium-v123.0.0-pack.tar";
-
-async function getBrowser() {
-  if (process.env.VERCEL_ENV === "production") {
-    const chromium = await import("@sparticuz/chromium-min").then(
-      (mod) => mod.default
-    );
-
-    const puppeteerCore = await import("puppeteer-core").then(
-      (mod) => mod.default
-    );
-
-    const executablePath = await chromium.executablePath(CHROMIUM_PATH);
-
-    const browser = await puppeteerCore.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath,
-      headless: true,
-    });
-    return browser;
-  } else {
-    const puppeteer = await import("puppeteer-core").then((mod) => mod.default);
-    const browser = await puppeteer.launch();
-    return browser;
-  }
-}
-
 export async function GET(request: NextRequest) {
-  const browser = await getBrowser();
+  try {
+    const browser = await getBrowser();
+    const requestUrl = new URL(request.url);
+    const urlQuery = requestUrl.searchParams.get("url");
+    const strictFilter = Boolean(
+      requestUrl.searchParams.get("strict") === "true"
+    );
 
-  const page = await browser.newPage();
-  await page.goto("https://example.com");
-  const pdf = await page.pdf();
-  await browser.close();
-  return new NextResponse(pdf, {
-    headers: {
-      "Content-Type": "application/pdf",
-    },
-  });
+    if (!urlQuery) {
+      return NextResponse.json(
+        { error: "Missing url parameter" },
+        { status: 400 }
+      );
+    }
+
+    const page = await browser.newPage();
+
+    const redirectPromise = page.waitForNavigation({
+      waitUntil: ["load", "domcontentloaded", "networkidle0"],
+    });
+
+    await page.goto(urlQuery);
+
+    await redirectPromise;
+
+    const htmlContent = await page.content();
+    const cleanedText = extractText(htmlContent);
+
+    const anchorElements = await page.$$eval("a", (links) => {
+      return links
+        .filter(
+          (link) =>
+            link.innerText.trim().length > 0 &&
+            link.hash === "" &&
+            link.href !== ""
+        )
+        .map((link) => {
+          const url = new URL(link.href);
+          return {
+            url: url.href,
+            text: link.innerText.trim(),
+            hostname: url.hostname,
+            pathname: url.pathname,
+          };
+        });
+    });
+
+    const currentUrl = new URL(urlQuery);
+    const basePath = currentUrl.pathname.endsWith("/")
+      ? currentUrl.pathname
+      : currentUrl.pathname + "/";
+
+    const nextLinks = anchorElements.filter((link) => {
+      // If strictFilter is true, only allow links that start with the base path.
+      // Example:
+      // For URL: https://orm.drizzle.team/docs/overview
+      // Allowed links:
+      // - /docs/overview
+      // - /docs/overview/xyz
+      // Disallowed links:
+      // - /docs/guides
+      if (strictFilter) {
+        return (
+          link.hostname === currentUrl.hostname &&
+          link.pathname.startsWith(basePath) &&
+          link.pathname !== currentUrl.pathname
+        );
+      }
+
+      // If strictFilter is false, allow all links that are not the same as the current URL.
+      // Example:
+      // For URL: https://orm.drizzle.team/docs/overview
+      // Allowed links:
+      // - /docs/overview
+      // - /docs/overview/xyz
+      // - /docs/guides
+      // - /drizzle-studio/overview
+      return (
+        link.hostname === currentUrl.hostname &&
+        link.pathname !== currentUrl.pathname
+      );
+    });
+
+    await browser.close();
+    return NextResponse.json(
+      {
+        total: nextLinks.length,
+        links: nextLinks,
+        cleanedText,
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: "An error occurred" }, { status: 500 });
+  }
 }
