@@ -125,7 +125,8 @@ export const removeUnwantedElements = (
   return cleanedHtml;
 };
 
-export function extractText(html: string, options: ScrapeOptions = {}): string {
+export function extractText(html: string, options: ScrapeOptions = {}) {
+  let title = load(html)('meta[property="og:title"]').attr("content");
   const cleanedHtml = removeUnwantedElements(html, options);
   const $ = load(cleanedHtml);
 
@@ -158,5 +159,8 @@ export function extractText(html: string, options: ScrapeOptions = {}): string {
   });
 
   const normalizedText = allText.replace(/\s+/g, " ").trim();
-  return normalizedText;
+  return {
+    cleanedText: normalizedText,
+    title: title || "",
+  };
 }

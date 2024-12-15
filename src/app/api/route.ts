@@ -15,9 +15,9 @@ export async function GET(request: NextRequest) {
     const strictFilter = Boolean(
       requestUrl.searchParams.get("strict") === "true"
     );
-    let type = requestUrl.searchParams.get("type") as ScraperType | null
+    let type = requestUrl.searchParams.get("type") as ScraperType | null;
     if (!type) {
-      type = "fetch"
+      type = "fetch";
     }
 
     if (!urlQuery) {
@@ -34,9 +34,9 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json(
         {
+          data: cleanedText,
           total: 0,
           links: [],
-          cleanedText,
         },
         { status: 200 }
       );
@@ -113,9 +113,9 @@ export async function GET(request: NextRequest) {
     await browser.close();
     return NextResponse.json(
       {
+        data: cleanedText,
         total: nextLinks.length,
         links: nextLinks,
-        cleanedText,
       },
       { status: 200 }
     );
